@@ -25,11 +25,11 @@
      questions your system answers. Write it for someone who has never seen
      this repo.
 
-     Milestone 5. 
+     Milestone 5. -->
 
      I picked the campus life corpus because it provides practical, everyday information that makes navigating university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets while getting around campus efficiently.
 
-     -->
+    
 
 
 
@@ -44,16 +44,15 @@
 
      If you changed your mind partway through, say so and say why. That's worth
      more than pretending you got it right first time.
+ 
+     Milestone 3.-->
 
-     <!-- 
-     Milestone 3. 
      **Chunk size: 700**
      **Overlap: 50**
 
      I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block. 
 
      I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
-     -->
 
 ## Sample Chunks
 
@@ -120,7 +119,7 @@ Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building
 <!-- One complete question and answer, pasted as text, with the source line
      visible. 
      
-     Milestone 4. 
+     Milestone 4.--> 
 
  python app.py ask "When is the best time to visit the dining hall?" --show-prompt
   (best distance 0.377, cutoff 0.6)
@@ -202,7 +201,7 @@ Sources retrieved: dining_halden_hall.txt, dining_halden_hall_followup.txt, dini
 
 
 | Question | In corpus? | Best distance |
-<!--
+
 
 Corpus: Campus_Life
 Best Distance: 0.377
@@ -216,20 +215,9 @@ Most of the other OUT_OF_SCOPE questions were .8 or higher
 ## How I Used AI
 
 <!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+     what you changed about it. 
+     Milestone 5. -->
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
-
-     Milestone 5. 
-     
-     "I asked Claude to evalute my chunking function which at first I selected size of 800 and
-     overlap of 100. Claude suggested that the overlap was too big and as a result my second
-     chunk would be a copy of the first"
-     -->
-
-     
 
 **1.**
 <!--"I asked Claude to evalute my chunking function I selected size of 800 and
