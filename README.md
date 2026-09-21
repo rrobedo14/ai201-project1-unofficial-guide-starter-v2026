@@ -220,12 +220,13 @@ Most of the other OUT_OF_SCOPE questions were .8 or higher
 
 
 **1.**
-<!--"I asked Claude to evalute my chunking function I selected size of 800 and
+     "I asked Claude to evalute my chunking function I selected size of 800 and
      overlap of 100. Claude suggested that the overlap was too big and as a result my second
-     chunk would be a copy of the first"-->
+     chunk would be a copy of the first"
+
 **2.**
-<!-- " I asked Claude to help me debug an error I keep getting: KeyError: '_type'. This was the solution: corrupted-cache situation " — python -c "import store; store.reset()" then re-index. 
--->
+     "I asked Claude to help me debug an error I keep getting: KeyError: '_type'. This was the solution: corrupted-cache situation " — python -c "import store; store.reset()" then re-index. 
+
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
