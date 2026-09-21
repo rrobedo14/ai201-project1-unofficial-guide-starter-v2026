@@ -25,12 +25,17 @@
      questions your system answers. Write it for someone who has never seen
      this repo.
 
-     Milestone 5. -->
+     Milestone 5. 
+
+     I picked the campus life corpus because it provides practical, everyday information that makes navigating university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets while getting around campus efficiently.
+
+     -->
+
+
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+
 
 <!-- What about YOUR documents made you pick these numbers? Short posts and
      long sectioned guides don't want the same chunking, and "800 seemed
@@ -40,7 +45,15 @@
      If you changed your mind partway through, say so and say why. That's worth
      more than pretending you got it right first time.
 
-     Milestone 3. -->
+     <!-- 
+     Milestone 3. 
+     **Chunk size: 700**
+     **Overlap: 50**
+
+     I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block. 
+
+     I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
+     -->
 
 ## Sample Chunks
 
@@ -54,119 +67,127 @@
      Milestone 3. -->
 
 ======================================================================
-Chunk 1  |  source: thread_bike_commute.txt#0  |  produced by: chunker.py::split_documents
+Chunk 1  |  source: admin_add_drop_deadline.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
-THREAD: Is a bike worth it for a 20 minute walk commute?
+On the add/drop deadline
 
---- reply 1 (14 votes) ---
-Yeah. Cuts an 18 minute walk to about 6. The thing nobody mentions is storage — covered bike parking exists at three buildings and is full by 9am at all three.
-
---- reply 2 (9 votes) ---
-Counterpoint, I sold mine. Between November and March the paths are either icy or salted and salt destroys a drivetrain in one season.
-
---- reply 3 (22 votes) ---
-Both true. I keep a cheap bike for September to November and walk the rest of the year. Total cost was about $120 for the bike and I don't care what happens to it.
-
---- reply 4 (5 votes) ---
-If you do get one, the campus does free registration and it's the only rea
+You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
 
 ======================================================================
-Chunk 2  |  source: thread_first_gen.txt#0  |  produced by: chunker.py::split_documents
+Chunk 2  |  source: course_biol_160.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
-THREAD: Anything specific for first-generation students?
+BIOL 160 Cell Biology
 
---- reply 1 (33 votes) ---
-The advising office has a specific programme and it is genuinely good, but it is opt-in and badly publicised. Ask for it by name.
+I lived here my sophomore year. Format is lecture three times a week with a weekly lab. Assessment: four unit tests and a cumulative final. Not curved.
 
---- reply 2 (41 votes) ---
-The thing I'd say: the unwritten rules are the hard part, not the coursework. Ask about the unwritten rules explicitly. People are happy to explain them and nobody volunteers them.
+Expect 9 to 11 hours a week, the heaviest first-year course by reputation.
 
---- reply 3 (16 votes) ---
-Emergency fund for textbooks and travel exists and is not means-tested beyond a short form.
+The one piece of advice: the unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
 
 ======================================================================
-Chunk 3  |  source: thread_laptop_specs.txt#0  |  produced by: chunker.py::split_documents
+Chunk 3  |  source: course_hist_118_workload.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
-THREAD: How much laptop do I actually need for CS courses?
+Workload for HIST 118 Modern World History
 
---- reply 1 (31 votes) ---
-Less than the recommended spec page says. 16GB of RAM is the one number worth paying for; everything else you'll never notice.
+People keep asking so: a lot of reading, about 120 pages a week, but no problem sets. That's real time, not optimistic time.
 
---- reply 2 (18 votes) ---
-Adding: the lab machines exist and are better than anything you'll buy. For the heavy assignments people just use those.
-
---- reply 3 (12 votes) ---
-I did two years on an 8GB machine and it was fine until the last project, at which point it very much wasn't. 16 is the answer.
+It's front-loaded — the first month is heavier than the rest, partly because you're learning the format.
 
 ======================================================================
-Chunk 4  |  source: thread_office_hours_etiquette.txt#0  |  produced by: chunker.py::split_documents
+Chunk 4  |  source: dining_pellew_dining_hall_followup.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
-THREAD: Is it weird to go to office hours with no specific question?
+Re: Pellew Dining Hall
 
---- reply 1 (44 votes) ---
-No, and this is the single most common thing first years get wrong. 'I'm following the lectures but I don't feel like I understand the shapeof it' is a completely normal thing to say.
+Adding to what people have said about Pellew Dining Hall. The wait figure of 12 to 18 minutes at peak matches what I've seen. If you're trying to eat between classes, go before 11:45 and it's a different building entirely.
 
---- reply 2 (29 votes) ---
-They're usually empty. You are doing the instructor a favour by turning up.
-
---- reply 3 (18 votes) ---
-If it helps, treat it as a standing appointment. Go every week for a month and it stops feeling like a thing.
+Also worth saying: the furthest hall from anywhere, next to the athletics centre. Nobody tells you this at orientation.
 
 ======================================================================
-Chunk 5  |  source: thread_professor_email.txt#0  |  produced by: chunker.py::split_documents
+Chunk 5  |  source: housing_innisfree_hall.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
-THREAD: Do professors actually answer email?
+Innisfree Hall — what it's actually like
 
---- reply 1 (21 votes) ---
-Varies enormously. General rule I've found: if the syllabus states a response window, it's honoured. If it doesn't, assume 48 hours and don't panic before then.
+Transferred in last year, so take this with a grain of salt. Built 1991, renovated 2022. Rooms are doubles arranged as pairs sharing one bathroom between two rooms.
 
---- reply 2 (33 votes) ---
-Office hours are dramatically more effective than email for anything that takes more than two sentences to answer. They're also usually empty.
+The good: the shared-bathroom-between-two-rooms arrangement is the best compromise on campus.
 
---- reply 3 (15 votes) ---
-Empty office hours is the biggest unused resource here and I say that having wasted a year not going.
+The bad: no air conditioning, which matters for the first three weeks of September.
 
-For each one, ask: could someone answer a question using only this,
-without reading what came before or after?
-
-**Chunk 1** — source: `` — produced by: ``
-
-```
-```
-
-**Chunk 2** — source: `` — produced by: ``
-
-```
-```
-
-**Chunk 3** — source: `` — produced by: ``
-
-```
-```
-
-**Chunk 4** — source: `` — produced by: ``
-
-```
-```
-
-**Chunk 5** — source: `` — produced by: ``
-
-```
-```
+Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building is L-shaped and the short wing is much quieter.
 
 ## Sample Answer
 
 <!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
-
+     visible. 
      
+     Milestone 4. 
 
-**Question:**
+ python app.py ask "When is the best time to visit the dining hall?" --show-prompt
+  (best distance 0.377, cutoff 0.6)
 
-**Answer:**
+======================================================================
+System instruction sent with the prompt
+======================================================================
+You answer questions using only the documents provided to you.
 
-```
-```
+Rules:
+- Use only the information in the documents below. Do not use anything you know from elsewhere.
+- If the documents don't cover the question, say you don't have enough information. Do not guess.
+- Name the document your answer came from, using the filename given in each excerpt.
+- Be brief. Two or three sentences is usually enough.
+
+======================================================================
+The assembled prompt, exactly as sent
+======================================================================
+Documents:
+
+[from dining_pellew_dining_hall_followup.txt]
+Re: Pellew Dining Hall
+
+Adding to what people have said about Pellew Dining Hall. The wait figure of 12 to 18 minutes at peak matches what I've seen. If you're trying to eat between classes, go before 11:45 and it's a different building entirely.
+
+Also worth saying: the furthest hall from anywhere, next to the athletics centre. Nobody tells you this at orientation.
+
+[from dining_halden_hall_followup.txt]
+Re: Halden Hall
+
+Adding to what people have said about Halden Hall. The wait figure of rarely more than 8 minutes matches what I've seen. If you're tryingto eat between classes, go before 11:45 and it's a different building entirely.
+
+Also worth saying: closes at 7:00pm, which catches people out. Nobody tells you this at orientation.
+
+[from dining_halden_hall.txt]
+Halden Hall
+
+I lived here my sophomore year. Wait times: rarely more than 8 minutes, even at noon. The thing worth going for is soup rotation, and thebread is baked on site. The thing to know is that closes at 7:00pm, which catches people out.
+
+Hours are 7:30am to 7:00pm weekdays, closed Sundays. Costs one meal swipe, or $10.00 cash.
+
+[from dining_pellew_dining_hall.txt]
+Pellew Dining Hall
+
+Second-year here. Wait times: 12 to 18 minutes at peak, and the peak is early — 11:45 to 12:30. The thing worth going for is a dedicated allergen-free station staffed by someone who knows the menu. The thing to know is that the furthest hall from anywhere, next to the athletics centre.
+
+Hours are 7:00am to 8:00pm daily. Costs one meal swipe, or $11.75 cash.
+
+[from dining_north_kitchen_followup.txt]
+Re: North Kitchen
+
+Adding to what people have said about North Kitchen. The wait figure of none matches what I've seen. If you're trying to eat between classes, go before 11:45 and it's a different building entirely.
+
+Also worth saying: closed all summer and during reading week. Nobody tells you this at orientation.
+
+---
+
+Question: When is the best time to visit the dining hall?
+
+Answer using only the documents above, and name the file you used.
+======================================================================
+
+To avoid the peak wait times between classes, it is recommended to go before 11:45 (`dining_pellew_dining_hall_followup.txt`, `dining_halden_hall_followup.txt`, and `dining_north_kitchen_followup.txt`).
+
+Sources retrieved: dining_halden_hall.txt, dining_halden_hall_followup.txt, dining_north_kitchen_followup.txt, dining_pellew_dining_hall.txt, dining_pellew_dining_hall_followup.txt
+
+1 model calls this session, 731 tokens (668 in, 63 out)
 
 **My relevance cutoff:**
 
@@ -179,8 +200,17 @@ without reading what came before or after?
 
      Milestone 4. -->
 
+
 | Question | In corpus? | Best distance |
-|---|---|---|
+<!--
+
+Corpus: Campus_Life
+Best Distance: 0.377
+|-"When is the best time to visit the dining hall?" --|--Campus_Life--|--0.377--|
+
+Most of the questions fell into the .2 - .6 range of best distance for the campus life
+Most of the other OUT_OF_SCOPE questions were .8 or higher
+
 |  |  |  |
 
 ## How I Used AI
@@ -192,11 +222,22 @@ without reading what came before or after?
      the overlap, so I added that myself" is the level of detail we're after.
      "I used AI to help me code" is not.
 
-     Milestone 5. -->
+     Milestone 5. 
+     
+     "I asked Claude to evalute my chunking function which at first I selected size of 800 and
+     overlap of 100. Claude suggested that the overlap was too big and as a result my second
+     chunk would be a copy of the first"
+     -->
+
+     
 
 **1.**
-
+<!--"I asked Claude to evalute my chunking function I selected size of 800 and
+     overlap of 100. Claude suggested that the overlap was too big and as a result my second
+     chunk would be a copy of the first"-->
 **2.**
+<!-- " I asked Claude to help me debug an error I keep getting: KeyError: '_type'. This was the solution: corrupted-cache situation " — python -c "import store; store.reset()" then re-index. 
+-->
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
