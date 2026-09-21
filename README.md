@@ -47,12 +47,12 @@
  
      Milestone 3.-->
 
-     **Chunk size: 700**
-     **Overlap: 50**
+ **Chunk size: 700**
+ **Overlap: 50**
 
-     I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block. 
+>I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block. 
 
-     I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
+>I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
 
 ## Sample Chunks
 
@@ -65,9 +65,11 @@
 
      Milestone 3. -->
 
-======================================================================
+==========================================================================
+
 Chunk 1  |  source: admin_add_drop_deadline.txt#0  |  produced by: chunker.py::split_documents
-======================================================================
+
+==========================================================================
 On the add/drop deadline
 
 You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
