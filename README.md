@@ -27,15 +27,9 @@
 
      Milestone 5. -->
 
- >   I picked the campus life corpus because it provides practical, everyday information that makes navigating university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets while getting around campus efficiently.
-
-    
-
-
+> I picked the campus life corpus because it provides practical, everyday information that makes navigating university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets while getting around campus efficiently.
 
 ## Chunking Strategy
-
-
 
 <!-- What about YOUR documents made you pick these numbers? Short posts and
      long sectioned guides don't want the same chunking, and "800 seemed
@@ -47,12 +41,12 @@
  
      Milestone 3.-->
 
- **Chunk size: 700**
- **Overlap: 50**
+- **Chunk size: 700**
+- **Overlap: 50**
 
->I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block. 
-
->I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
+> I initially set a much larger chunk size of 2000 with zero overlap, thinking that keeping massive blocks would preserve as much context as possible. However, after looking at the actual campus life documents, I realized that swallowed multiple distinct topics (like mixing dining hall hours with building locations) into a single block.
+>
+> I experimented with smaller fractional splits next, but they frequently chopped sentences in half. Settling on a chunk size of 700 with a 50-character overlap hit the sweet spot: it kept individual schedule or dining descriptions coherent and self-contained, while the small overlap ensured smooth continuity across chunk boundaries.
 
 ## Sample Chunks
 
@@ -65,15 +59,16 @@
 
      Milestone 3. -->
 
-==========================================================================
-
+```text
+======================================================================
 Chunk 1  |  source: admin_add_drop_deadline.txt#0  |  produced by: chunker.py::split_documents
-
-==========================================================================
+======================================================================
 On the add/drop deadline
 
 You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
+```
 
+```text
 ======================================================================
 Chunk 2  |  source: course_biol_160.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
@@ -84,7 +79,9 @@ I lived here my sophomore year. Format is lecture three times a week with a week
 Expect 9 to 11 hours a week, the heaviest first-year course by reputation.
 
 The one piece of advice: the unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
+```
 
+```text
 ======================================================================
 Chunk 3  |  source: course_hist_118_workload.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
@@ -93,7 +90,9 @@ Workload for HIST 118 Modern World History
 People keep asking so: a lot of reading, about 120 pages a week, but no problem sets. That's real time, not optimistic time.
 
 It's front-loaded — the first month is heavier than the rest, partly because you're learning the format.
+```
 
+```text
 ======================================================================
 Chunk 4  |  source: dining_pellew_dining_hall_followup.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
@@ -102,7 +101,9 @@ Re: Pellew Dining Hall
 Adding to what people have said about Pellew Dining Hall. The wait figure of 12 to 18 minutes at peak matches what I've seen. If you're trying to eat between classes, go before 11:45 and it's a different building entirely.
 
 Also worth saying: the furthest hall from anywhere, next to the athletics centre. Nobody tells you this at orientation.
+```
 
+```text
 ======================================================================
 Chunk 5  |  source: housing_innisfree_hall.txt#0  |  produced by: chunker.py::split_documents
 ======================================================================
@@ -115,6 +116,7 @@ The good: the shared-bathroom-between-two-rooms arrangement is the best compromi
 The bad: no air conditioning, which matters for the first three weeks of September.
 
 Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building is L-shaped and the short wing is much quieter.
+```
 
 ## Sample Answer
 
@@ -123,7 +125,8 @@ Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building
      
      Milestone 4.--> 
 
- python app.py ask "When is the best time to visit the dining hall?" --show-prompt
+```console
+$ python app.py ask "When is the best time to visit the dining hall?" --show-prompt
   (best distance 0.377, cutoff 0.6)
 
 ======================================================================
@@ -189,6 +192,7 @@ To avoid the peak wait times between classes, it is recommended to go before 11:
 Sources retrieved: dining_halden_hall.txt, dining_halden_hall_followup.txt, dining_north_kitchen_followup.txt, dining_pellew_dining_hall.txt, dining_pellew_dining_hall_followup.txt
 
 1 model calls this session, 731 tokens (668 in, 63 out)
+```
 
 **My relevance cutoff:**
 
@@ -203,16 +207,20 @@ Sources retrieved: dining_halden_hall.txt, dining_halden_hall_followup.txt, dini
 
 
 | Question | In corpus? | Best distance |
-
-
-Corpus: Campus_Life
-Best Distance: 0.377
-|-"When is the best time to visit the dining hall?" --|--Campus_Life--|--0.377--|
-
-Most of the questions fell into the .2 - .6 range of best distance for the campus life
-Most of the other OUT_OF_SCOPE questions were .8 or higher
-
+|---|---|---|
+| "When is the best time to visit the dining hall?" | Yes (Campus_Life) | 0.377 |
 |  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+|  |  |  |
+
+Most of the questions fell into the .2 - .6 range of best distance for the campus life.
+Most of the other OUT_OF_SCOPE questions were .8 or higher.
 
 ## How I Used AI
 
@@ -221,13 +229,13 @@ Most of the other OUT_OF_SCOPE questions were .8 or higher
      Milestone 5. -->
 
 
-**1.**
-     "I asked Claude to evalute my chunking function I selected size of 800 and
-     overlap of 100. Claude suggested that the overlap was too big and as a result my second
-     chunk would be a copy of the first"
+**1.** I asked Claude to evaluate my chunking function — I had selected a size of 800 and
+an overlap of 100. Claude pointed out that the overlap was too big, and that as a result my
+second chunk would largely be a copy of the first.
 
-**2.**
-     "I asked Claude to help me debug an error I keep getting: KeyError: '_type'. This was the solution: corrupted-cache situation " — python -c "import store; store.reset()" then re-index. 
+**2.** I asked Claude to help me debug an error I kept getting: `KeyError: '_type'`. The
+diagnosis was a corrupted-cache situation, and the fix was `python -c "import store; store.reset()"`
+followed by a re-index.
 
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
