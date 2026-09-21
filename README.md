@@ -1,6 +1,6 @@
 # The Unofficial Guide
 
-<!-- Replace this line with your name and which corpus you picked. -->
+<!-- Rogelio Robedo (campus_life) -->
 
 > **This file is your submission.** Fill it in as you go — most sections get
 > written during the milestone that produces them, not at the end.
@@ -27,7 +27,7 @@
 
      Milestone 5. -->
 
-     I picked the campus life corpus because it provides practical, everyday information that makes navigating university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets while getting around campus efficiently.
+ >    I picked the campus life corpus because it provides practical, everyday information that makes navigating >university life much easier. The system answers questions about campus dining hours, pricing, and locations, such as >finding the closest dining hall to the library. Ultimately, it helps students optimize their schedules and budgets >while getting around campus efficiently.
 
     
 
