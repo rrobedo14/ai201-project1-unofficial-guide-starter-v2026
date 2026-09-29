@@ -57,7 +57,7 @@ in at least 4 of 5 tries.
 
 ## 4. No individual chunk exceeds 2,000
 
-No individual chunk exceeds 2,000 tokens for 4/5 questions
+No individual chunk exceeds 2,000 tokens for 5/5 questions
 
 <!-- YOU WRITE THIS ONE.
 

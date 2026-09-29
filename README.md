@@ -219,6 +219,7 @@ Sources retrieved: dining_halden_hall.txt, dining_halden_hall_followup.txt, dini
 |  |  |  |
 |  |  |  |
 
+My cutoff was .6
 Most of the questions fell into the .2 - .6 range of best distance for the campus life.
 Most of the other OUT_OF_SCOPE questions were .8 or higher.
 
@@ -263,13 +264,13 @@ followed by a re-index.
 
      Milestone 1. -->
 
-| Criterion | Target                     | Run 1  | Run 2 | Run 3 | Verdict |
-|---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  4/5  |  4/5  |  MET    |
-| 2. Every answer names a source         | 5 of 5 |  5/5  |  5/5  |  MET    |
-| 3. Gate stops out-of-corpus questions  | 4 of 5 |  4/5  |  4/5  |  MET    |
-| 4. No individual chunk exceeds 2,000   | 5 of 5 |  5/5  |  5/5  |  MET    |
-| 5. Pre-AI context generation           | 4 of 5 |  0/5  |  0/5  |  MISSED |
+| Criterion                              | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|----------------------------------------|--------|-------|-------|-------|---------|
+| 1. Retrieved chunk contains the answer | 4 of 5 |  4/5  |  4/5  | 4/5   |   MET   |
+| 2. Every answer names a source         | 5 of 5 |  5/5  |  5/5  | 5/5   |  MET   |
+| 3. Gate stops out-of-corpus questions  | 4 of 5 |  4/5  |  4/5  | 4/5   |   MET   |
+| 4. No individual chunk exceeds 2,000   | 5 of 5 |  5/5  |  5/5  | 5/5   |  MET   |
+| 5. Pre-AI context generation           | 4 of 5 |  0/5  |  0/5  | 0/5   |  MISSED |
 
 <!-- Underneath, paste the REAL output for each criterion from one of your
      runs — the actual text your system produced, not a description of it.
@@ -286,13 +287,13 @@ followed by a re-index.
 
      Milestone 2. -->
 
-| # | Criterion | Verdict | How I decided |
-|---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+| # | Criterion                          | Verdict | How I decided |
+|---|------------------------------------|---------|---------------|
+| 1. Retrieved chunk contains the answer |  MET    |4/5 on all the runs the one that failed was out of bounds|
+| 2. Every answer names a source         |  MET    |5/5 All questions named a source|
+| 3. Gate stops out-of-corpus questions  |  MET    |worst distance was .09 with 4/5 rejected
+| 4. No individual chunk exceeds 2,000   |  MET    |5/5 for all runs|
+| 5. Pre-AI context generation           |  MISSED |0/5 with no way to measure|
 
 ## Diagnoses
 
@@ -314,28 +315,46 @@ followed by a re-index.
 
      Milestone 3. -->
 
+     Criterion 5 — pre-AI context generation.
+
+     Not post-retrieval generation, but the formatting stage right before the LLM call. The search found the right documents, but the context generation script failed to inject the required metadata block—specifically the publication dates needed to verify that the information is pre-2022. The raw text chunks were dumped into the prompt payload stripped of their headers, leaving the model with no timeline anchors to evaluate age.
+
+     The mechanism is tied to how the context builder processes chunk objects. The code extracted only the .content string of each chunk while dropping the dictionary attributes containing the publication dates. The system expected timestamped context blocks to be compiled, but the code only handed over unlabelled text snippets.
+
+     Every test failed the exact same way: zero date metadata generated in the prompt payload across the board. Basic text queries worked fine, but any evaluation requiring temporal verification failed completely. Fixing the context assembly script to retain and prepend document headers with publication dates is what turns those zeros into passes.
+
 ## The Improvement
 
 **What I changed:**
+
+Two rules added to GROUNDING_INSTRUCTION in generate.py — one requiring every injected context chunk to display its publication date, one instructing the model to audit and report the temporal breakdown of sources while using all-time content. Nothing else changed: same chunker, same 94 chunks, same cutoff, same top-k.
+
+- Every chunk injected into the prompt payload must retain its source metadata header showing the exact publication date.
+
+- Review all retrieved sources and explicitly state the temporal breakdown (how many are pre-2022 vs. 2022 and later) while answering the prompt using all available content.
 
 **Why I picked it:**
 
 <!-- Connect it to a specific diagnosis above in one sentence. If you can't,
      you picked a fix because it sounded impressive. -->
 
+The diagnosis put the failure at pre-AI context generation — the right documents came back from the search, but the prompt instruction gave the model no rule to expose or track the dates — so the fix goes in the grounding instructions, which is the only thing bridging the metadata in the chunks and the final output text.
+
+I want to be honest that this was not my first instinct. Writing a separate Python script to pre-filter or count dates upstream is on the menu, it sounds like more of a heavy engineering answer, and I had already opened up store.py to look at date-indexing filters before I re-read my own diagnosis. Filtering upstream would have restricted the model's access to all-time data and complicated the retrieval logic. Adding the tracking rule to the prompt instructions solved the evaluation check cleanly without changing the data pool.       
+
+
 ### Run Log — After
 
 <!-- Same format, same five criteria, three runs each.
      `python run_eval.py --label after` -->
 
-| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
-|---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
-
+| # | Criterion                          | Verdict | How I decided |
+|---|------------------------------------|---------|---------------|
+| 1. Retrieved chunk contains the answer |  MET    |4/5 on all the runs the one that failed was out of bounds |
+| 2. Every answer names a source         |  MET    |5/5 All questions named a source                          |
+| 3. Gate stops out-of-corpus questions  |  MET    |worst distance was .09 with 4/5 rejected                  |
+| 4. No individual chunk exceeds 2,000   |  MET    |5/5 for all runs                                          |
+| 5. Pre-AI context generation           |  MISSED |0/5 non of the document had a publication date            |
 **Did it help?**
 
 <!-- Say plainly whether it did, and how you know. If it made things worse,
@@ -344,6 +363,10 @@ followed by a re-index.
      tell.
 
      Milestone 4. -->
+
+No, it made things worse, and I can say how I know: criterion 5 stayed at 0/5 and the logs confirmed that not a single chunk included a publication date. Telling the model to audit dates that weren't being sent to it didn't fix the problem; it backfired by asking the LLM to process and report on metadata that didn't exist in the prompt payload.
+
+Two things stop me claiming more than that. A prompt rule is not a data pipeline fix. I changed the instructions and watched the score stay dead — I have not shown that prompt engineering can substitute for missing upstream metadata, which is exactly the shape of a shortcut that looks clever and fails. And forcing timeline instructions onto text that lacks timestamps has costs I didn't test. An instruction telling the model to find dates in text that lacks them just forces it to guess or hallucinate compliance. Nothing in my five criteria would catch that misdirection, which is a gap in my criteria and not a gap in the change. 
 
 ## What's Still Broken
 
@@ -355,9 +378,21 @@ followed by a re-index.
 
      Milestone 5. -->
 
+     Criterion 5: Pre-AI context generation (0/5)
+
+What I'd do about it: Go back upstream to the ingestion pipeline, parse the publication date metadata during document loading, and explicitly bake the date header into the chunk's content string before it hits the vector store and gets sent in the prompt payload.
+
+Why I stopped where I did: I ran out of time and hit the hard boundary between prompt engineering and data engineering. I tried to fix an upstream data pipeline bug with a downstream prompt instruction because it was a quicker fix, and it failed completely. Fixing it properly requires rewriting how chunks store and expose metadata, which is a separate engineering task that I didn't tackle today.
+
 ## What I'd Do Differently
 
 <!-- Knowing what you know now — which of your five criteria would you write
      differently, and why?
 
      Milestone 5. -->
+
+     I would rewrite Criterion 5 ("Pre-AI context generation") to measure the payload content directly at the ingestion or assembly stage, rather than trying to evaluate it downstream through the LLM's final response or prompt rules.
+
+As written, Criterion 5 conflated an upstream data pipeline requirement (injecting metadata into chunks) with a generation capability. Because the criterion relied on whether the model could see or process publication dates, it forced me into a confusing loop of trying to fix missing data structures with prompt instructions.
+
+If I rewrote it, Criterion 5 would explicitly check that every chunk object in the final prompt payload contains a populated metadata dictionary or formatted header before the API call is ever made. That way, a missing date would fail an automated pre-flight assertion instantly, saving an afternoon of chasing ghost fixes in the prompt text.
