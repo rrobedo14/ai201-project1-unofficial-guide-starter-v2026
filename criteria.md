@@ -76,7 +76,7 @@ No individual chunk exceeds 2,000 tokens
 <!-- Keeping each piece well within Gemini’s file and document limits while avoiding bloated retrieval context
 
 
----
+--->
 
 ## 5. Your choice
 
