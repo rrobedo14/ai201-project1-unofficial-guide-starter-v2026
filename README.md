@@ -391,7 +391,7 @@ Why I stopped where I did: I ran out of time and hit the hard boundary between p
 
      Milestone 5. -->
 
-     I would rewrite Criterion 5 ("Pre-AI context generation") to measure the payload content directly at the ingestion or assembly stage, rather than trying to evaluate it downstream through the LLM's final response or prompt rules.
+I would rewrite Criterion 5 ("Pre-AI context generation") to measure the payload content directly at the ingestion or assembly stage, rather than trying to evaluate it downstream through the LLM's final response or prompt rules.
 
 As written, Criterion 5 conflated an upstream data pipeline requirement (injecting metadata into chunks) with a generation capability. Because the criterion relied on whether the model could see or process publication dates, it forced me into a confusing loop of trying to fix missing data structures with prompt instructions.
 
