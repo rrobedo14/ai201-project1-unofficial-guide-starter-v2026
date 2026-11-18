@@ -423,11 +423,11 @@ I'm taking shape A, deploy and instrument, on the local path (Path B). The Unoff
 
 ## Running It
 
-It runs locally, with logs (Path B). From the project folder, with the virtual
-environment active and a `GEMINI_API_KEY` in `.env`:
+It runs locally, with logs (Path B). From the project folder, once the
+packages are installed in `.venv` and a `GEMINI_API_KEY` is in `.env`:
 
 ```bash
-python serve.py
+.venv/Scripts/python serve.py        # macOS / Linux: .venv/bin/python serve.py
 ```
 
 That one command builds the search index first if there isn't one (a fresh

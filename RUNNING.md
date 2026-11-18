@@ -266,10 +266,10 @@ structured log that gets committed as the record of a real session.
 
 ### The start command
 
-From the project folder, with the virtual environment active:
+From the project folder, once the setup below is done:
 
 ```bash
-python serve.py
+.venv/Scripts/python serve.py        # macOS / Linux: .venv/bin/python serve.py
 ```
 
 That one command:
@@ -284,14 +284,23 @@ Stop it with **Ctrl+C**.
 ### From a clean checkout
 
 ```bash
-git clone <this repository's URL>
+git clone https://github.com/rrobedo14/ai201-project1-unofficial-guide-starter-v2026.git
 cd ai201-project1-unofficial-guide-starter-v2026
 python -m venv .venv
-source .venv/Scripts/activate        # macOS / Linux: source .venv/bin/activate
-pip install -r requirements-lock.txt
+.venv/Scripts/python -m pip install -r requirements-lock.txt
 cp .env.example .env                 # then paste your GEMINI_API_KEY into .env
-python serve.py
+.venv/Scripts/python serve.py
 ```
+
+On macOS or Linux, use `.venv/bin/python` wherever this says
+`.venv/Scripts/python`.
+
+These call the virtual environment's own Python directly instead of
+activating it first. In Git Bash on Windows, Python 3.11's `activate` script
+sets the environment's path in Windows form (`C:\...`), and Git Bash splits
+paths on the colon, so activation can fail silently: `pip` then reports
+"Permission denied" and `python` turns out to be the system one, without
+Flask. Calling `.venv/Scripts/python` works the same in every terminal.
 
 Check it's up from a second terminal:
 
