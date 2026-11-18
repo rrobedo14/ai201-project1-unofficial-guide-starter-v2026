@@ -255,3 +255,71 @@ units.
 
 `results/` is deliberately **not** in `.gitignore`. Your run logs are evidence
 that the test actually happened, and they're part of what gets graded.
+
+---
+
+## Capstone Project
+
+**Path: local with logs.** The Unofficial Guide runs on my own machine, started
+by one command, and every `/ask` request it handles writes a line to a
+structured log that gets committed as the record of a real session.
+
+### The start command
+
+From the project folder, with the virtual environment active:
+
+```bash
+python serve.py
+```
+
+That one command:
+
+1. builds the search index for the corpus if there isn't one yet (`chroma_db/`
+   is gitignored, so a fresh clone never has one),
+2. starts the service on `http://localhost:5000` (or on `PORT` if it's set),
+3. writes one JSON line per `/ask` request to `logs/requests.jsonl`.
+
+Stop it with **Ctrl+C**.
+
+### From a clean checkout
+
+```bash
+git clone <this repository's URL>
+cd ai201-project1-unofficial-guide-starter-v2026
+python -m venv .venv
+source .venv/Scripts/activate        # macOS / Linux: source .venv/bin/activate
+pip install -r requirements-lock.txt
+cp .env.example .env                 # then paste your GEMINI_API_KEY into .env
+python serve.py
+```
+
+Check it's up from a second terminal:
+
+```bash
+curl http://localhost:5000/health
+curl -X POST http://localhost:5000/ask -H "Content-Type: application/json" \
+  -d '{"question": "is the housing lottery random?"}'
+cat logs/requests.jsonl
+```
+
+### What the environment needs
+
+| Need | Detail |
+|---|---|
+| Python | **3.11.9** (the course supports 3.11–3.13, not 3.14) |
+| Dependencies | `requirements-lock.txt`: all 108 packages at the exact versions the run record was made with. The direct ones are `chromadb==0.6.3`, `google-genai==1.75.0`, `Flask==3.1.3`, `python-dotenv==1.1.1`, `posthog==3.25.0`, `rank-bm25==0.2.2`, `gunicorn==23.0.0`. `requirements.txt` keeps the course's version ranges. |
+| API key | `GEMINI_API_KEY` in `.env`, a free key from Google AI Studio. Generation is the only part that calls out. |
+| Generation model | `gemini-3.5-flash-lite`, hosted by Google. Nothing to download. |
+| Embedding model | `all-MiniLM-L6-v2` (ONNX), downloaded automatically by Chroma on first use to `~/.cache/chroma/onnx_models/`: an 83 MB download, about 91 MB unpacked (`model.onnx` is 90 MB). |
+| Search index | Built by `python serve.py` into `chroma_db/` on first start. A few MB per corpus, rebuilt in seconds. |
+| Disk and memory | About 100 MB for the models and index, on top of the installed packages. Runs comfortably on a laptop. |
+| Optional | `AI201_PRICE_INPUT_PER_M` and `AI201_PRICE_OUTPUT_PER_M` in `.env` turn logged tokens into `cost_usd`. `AI201_CORPUS` switches corpus (default `campus_life`). |
+
+### What gets recorded
+
+Each `/ask` writes one line to `logs/requests.jsonl` with: `timestamp`,
+`question`, `status`, `outcome` (answered / refused / bad_request / error),
+`best_distance`, `threshold`, `sources`, `model_calls`, `cache_hit`,
+`prompt_tokens`, `output_tokens`, `cost_usd` and `latency_ms`, plus `error`
+when something fails. Tokens are the counts Gemini reports on each response,
+not estimates. A cached answer logs 0 tokens and `cache_hit: true`.

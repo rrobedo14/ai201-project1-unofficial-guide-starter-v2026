@@ -410,3 +410,96 @@ I'm taking shape A, deploy and instrument, on the local path (Path B). The Unoff
 - **I'm not hosting it.** I thought about deploying `serve.py` to a free host, since it already listens on `PORT` and `0.0.0.0`. Running locally with a committed log covers the same goals without spending the unit on accounts, secrets and a host's memory limits.
 - **I'm not changing the cache or adding retries.** `generate.py` already caches answers, so a repeated question costs nothing. I'm leaving that as it is and logging when it's hit, rather than tuning it. Retrying failed Gemini calls is hardening (shape B). Either change would move the numbers before I've recorded what the system costs as it is.
 
+
+
+## Instrumentation
+
+Every `/ask` request writes one JSON line to `logs/requests.jsonl`. The code is
+`serve.py::ask` and `serve.py::_log_request`. Each line records the question,
+the HTTP status, the outcome (answered / refused / bad_request / error), the
+best retrieval distance and the threshold it was compared to, the sources, how
+many model calls it made, whether the answer came from the cache, the input
+and output tokens Gemini reported, the cost, how long the request took, and
+the error if there was one. A request that fails still gets a line. Logging is
+wrapped so that a logging failure can never fail the request itself.
+
+The full record of one real session on 2026-11-18, 16 requests against
+`python serve.py` on the `campus_life` corpus, copied from
+`logs/requests.jsonl` unedited:
+
+```json
+{"timestamp": "2026-11-18T01:13:59+00:00", "question": "What time does the dining hall near the library close?", "status": 200, "outcome": "answered", "best_distance": 0.3901, "threshold": 0.6, "sources": ["dining_halden_hall.txt", "dining_halden_hall_followup.txt", "dining_north_kitchen_followup.txt", "housing_morrow_house_noise.txt", "study_library_hours.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 142.7, "error": null}
+{"timestamp": "2026-11-18T01:14:03+00:00", "question": "What is the capital of Mongolia?", "status": 200, "outcome": "refused", "best_distance": 0.8246, "threshold": 0.6, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 28.7, "error": null}
+{"timestamp": "2026-11-18T01:14:06+00:00", "question": null, "status": 400, "outcome": "bad_request", "best_distance": null, "threshold": null, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 0.1, "error": null}
+{"timestamp": "2026-11-18T01:14:10+00:00", "question": "What time does the dining hall near the library close?", "status": 200, "outcome": "answered", "best_distance": 0.3901, "threshold": 0.6, "sources": ["dining_halden_hall.txt", "dining_halden_hall_followup.txt", "dining_north_kitchen_followup.txt", "housing_morrow_house_noise.txt", "study_library_hours.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 28.1, "error": null}
+{"timestamp": "2026-11-18T01:16:13+00:00", "question": "Who won the 2018 World Cup?", "status": 200, "outcome": "refused", "best_distance": 0.889, "threshold": 0.6, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 34.4, "error": null}
+{"timestamp": "2026-11-18T01:16:13+00:00", "question": "How do I bake sourdough bread?", "status": 200, "outcome": "refused", "best_distance": 0.8295, "threshold": 0.6, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 39.6, "error": null}
+{"timestamp": "2026-11-18T01:16:23+00:00", "question": "When is the add/drop deadline?", "status": 200, "outcome": "answered", "best_distance": 0.3737, "threshold": 0.6, "sources": ["admin_add_drop_deadline.txt", "admin_pass_fail_option.txt", "admin_withdrawal_deadline.txt", "advising_registration.txt", "course_cs_340_workload.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 580, "output_tokens": 83, "cost_usd": null, "latency_ms": 2064.5, "error": null}
+{"timestamp": "2026-11-18T01:16:37+00:00", "question": "When is the add/drop deadline?", "status": 200, "outcome": "answered", "best_distance": 0.3737, "threshold": 0.6, "sources": ["admin_add_drop_deadline.txt", "admin_pass_fail_option.txt", "admin_withdrawal_deadline.txt", "advising_registration.txt", "course_cs_340_workload.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 28.1, "error": null}
+{"timestamp": "2026-11-18T01:16:38+00:00", "question": "How much does laundry cost in Innisfree Hall?", "status": 200, "outcome": "answered", "best_distance": 0.2052, "threshold": 0.6, "sources": ["housing_aldridge_hall.txt", "housing_aldridge_hall_laundry.txt", "housing_calder_annexe.txt", "housing_innisfree_hall.txt", "housing_innisfree_hall_laundry.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 771, "output_tokens": 77, "cost_usd": null, "latency_ms": 985.6, "error": null}
+{"timestamp": "2026-11-18T01:16:50+00:00", "question": "Is Morrow House noisy?", "status": 200, "outcome": "answered", "best_distance": 0.3658, "threshold": 0.6, "sources": ["housing_fenwick_court_noise.txt", "housing_innisfree_hall_noise.txt", "housing_morrow_house.txt", "housing_morrow_house_noise.txt", "housing_old_brewhouse_noise.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 657, "output_tokens": 98, "cost_usd": null, "latency_ms": 921.1, "error": null}
+{"timestamp": "2026-11-18T01:17:55+00:00", "question": "Is CS 210 a heavy workload?", "status": 200, "outcome": "answered", "best_distance": 0.3392, "threshold": 0.6, "sources": ["course_cs_210_workload.txt", "course_cs_340_workload.txt", "course_engl_205_workload.txt", "course_hist_118_workload.txt", "course_phys_130_workload.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 611, "output_tokens": 130, "cost_usd": null, "latency_ms": 1122.1, "error": null}
+{"timestamp": "2026-11-18T01:17:56+00:00", "question": "How do I get a parking permit?", "status": 200, "outcome": "answered", "best_distance": 0.5339, "threshold": 0.6, "sources": ["admin_graduation_requirements.txt", "admin_parking_permits.txt", "advising_registration.txt", "dining_pellew_dining_hall.txt", "transit_shuttle.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 634, "output_tokens": 101, "cost_usd": null, "latency_ms": 812.2, "error": null}
+{"timestamp": "2026-11-18T01:17:57+00:00", "question": "What are the library hours?", "status": 200, "outcome": "answered", "best_distance": 0.3929, "threshold": 0.6, "sources": ["admin_library_holds.txt", "housing_calder_annexe_noise.txt", "housing_morrow_house_noise.txt", "study_group_rooms.txt", "study_library_hours.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 586, "output_tokens": 84, "cost_usd": null, "latency_ms": 854.1, "error": null}
+{"timestamp": "2026-11-18T01:17:58+00:00", "question": "Can I take a class pass/fail?", "status": 200, "outcome": "answered", "best_distance": 0.4048, "threshold": 0.6, "sources": ["admin_add_drop_deadline.txt", "admin_declaring_a_major.txt", "admin_graduation_requirements.txt", "admin_pass_fail_option.txt", "course_stat_150.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 593, "output_tokens": 117, "cost_usd": null, "latency_ms": 886.7, "error": null}
+{"timestamp": "2026-11-18T01:17:59+00:00", "question": "How often does the campus shuttle run?", "status": 200, "outcome": "answered", "best_distance": 0.4132, "threshold": 0.6, "sources": ["course_stat_150_workload.txt", "dining_the_ridgeway_cafe.txt", "dining_verrill_street_grill.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 711, "output_tokens": 79, "cost_usd": null, "latency_ms": 691.9, "error": null}
+{"timestamp": "2026-11-18T01:18:00+00:00", "question": null, "status": 400, "outcome": "bad_request", "best_distance": null, "threshold": null, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 0.1, "error": null}
+```
+
+What the session covers:
+
+| Outcome | Count | What the log shows |
+|---|---|---|
+| Answered with a model call | 8 | 1 model call each, 580–771 tokens in and 77–130 out, 692–2,065 ms |
+| Answered from the cache | 3 | `cache_hit: true`, 0 tokens, 28–143 ms |
+| Refused by the relevance gate | 3 | best distance 0.82–0.89, over the 0.6 cutoff, so no model call, 29–40 ms |
+| **Rejected input (failed run)** | **2** | `"status": 400`, `"outcome": "bad_request"`: one empty body `{}` and one where `question` was the number `12345` |
+
+**The failure path.** The two rejected inputs are the failed runs: lines 3
+and 16, both `400 bad_request`, logged with no question, no model call and 0
+tokens. I also tried for an error inside the pipeline, but nothing in this
+session raised one. There were no 500s and no timeouts, so no line has a
+non-null `error` field. The `error` outcome is wired up (`serve.py::ask` logs
+it before returning the 500) but this session never exercised it.
+
+`cost_usd` is `null` on every line because I measure cost in tokens, not
+dollars (see below), so no price is set in `.env`.
+
+## What It Costs
+
+**About 739 tokens per question that reaches the model: roughly 643 in and
+96 out.** Refused questions, cached answers and rejected input cost 0 tokens.
+
+**Method.** Gemini returns token counts on every response
+(`usage_metadata.prompt_token_count` for input and `candidates_token_count`
+for output). `generate.py` adds them to session totals, and `serve.py::ask`
+takes the before-and-after difference for each request and logs it as
+`prompt_tokens` and `output_tokens`. These are measured counts from the
+service, not estimates from the prompt length. I also checked for hidden
+thinking tokens: a test call reported `thoughts_token_count: None`, and the
+total equalled input plus output, so the logged counts are everything the
+model used.
+
+**From the session above:**
+
+| | Tokens |
+|---|---|
+| Requests that called the model | 8 of 16 |
+| Input tokens (total) | 5,143, about 643 per call |
+| Output tokens (total) | 769, about 96 per call |
+| Total for the session | **5,912** |
+| Per model call | **739** on average (range 663–848) |
+| Per answered question, including 3 cache hits | 537 |
+| Per request, all 16 | 370, because half the requests never reached the model |
+| 1,000 questions, none cached | about **739,000** |
+
+Two things the numbers show:
+- **Most of the tokens are the prompt, not the answer.** Input is 87% of every
+  call (643 of 739). That's the five retrieved chunks plus the instructions, so
+  `TOP_K` and chunk size drive the token cost far more than answer length.
+- **The gate and the cache are the token controls.** A refused question stops
+  before the model and uses 0 tokens. So does a cached repeat, which also came
+  back in about 30 ms instead of about 900 ms.
+
+Embeddings run locally (`all-MiniLM-L6-v2` through Chroma) and use no API
+tokens.
