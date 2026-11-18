@@ -406,6 +406,7 @@ I'm taking shape A, deploy and instrument, on the local path (Path B). The Unoff
 
 **Out of scope**
 
-- **I'm not fixing the missing publication dates.** Criterion 5 from unit 2 failed because chunks don't carry their dates, and I already know the fix is in ingestion. But that's a new capability (shape C), not instrumentation, and it would change the answers I'm trying to measure. It stays in What's Still Broken.
+- **I'm not fixing the missing publication dates.** Criterion 5 from unit 2 failed because chunks don't carry their dates, and I already know the fix is in ingestion. But that's a new capability (shape C), not instrumentation, and it would change the answers I'm trying to measure.
 - **I'm not hosting it.** I thought about deploying `serve.py` to a free host, since it already listens on `PORT` and `0.0.0.0`. Running locally with a committed log covers the same goals without spending the unit on accounts, secrets and a host's memory limits.
 - **I'm not changing the cache or adding retries.** `generate.py` already caches answers, so a repeated question costs nothing. I'm leaving that as it is and logging when it's hit, rather than tuning it. Retrying failed Gemini calls is hardening (shape B). Either change would move the numbers before I've recorded what the system costs as it is.
+
