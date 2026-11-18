@@ -144,19 +144,17 @@ def ask():
             400,
         )
 
-    # generate.py keeps running totals for the session; this request's share
-    # is the difference before and after. (Fine for one local user; two
-    # requests at the same moment would blur each other's counts.)
-    tokens_before = generate.token_counts()
-    calls_before = generate.call_count()
-    hits_before = generate._cache_hits
+    # This request's own usage, counted per thread in generate.py. It used to
+    # be the change in session-wide totals, which overlapping requests share,
+    # so two requests at once picked up each other's calls and tokens.
+    generate.reset_request_usage()
 
     def record_usage() -> None:
-        tokens_after = generate.token_counts()
-        entry["prompt_tokens"] = tokens_after["prompt"] - tokens_before["prompt"]
-        entry["output_tokens"] = tokens_after["output"] - tokens_before["output"]
-        entry["model_calls"] = generate.call_count() - calls_before
-        entry["cache_hit"] = generate._cache_hits > hits_before
+        used = generate.request_usage()
+        entry["prompt_tokens"] = used["prompt"]
+        entry["output_tokens"] = used["output"]
+        entry["model_calls"] = used["calls"]
+        entry["cache_hit"] = used["cache_hit"]
         entry["cost_usd"] = _cost(entry["prompt_tokens"], entry["output_tokens"])
 
     try:

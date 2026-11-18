@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import sys
+import threading
 import time
 
 import config
@@ -43,6 +44,31 @@ _session_output_tokens = 0
 _cache_hits = 0
 _client = None
 _budget_warned = False
+
+# Capstone: usage for the request currently running on this thread. The
+# session totals above are shared by every request in flight, so a web request
+# that measures itself by subtracting them picks up any other request running
+# at the same time. Flask gives each request its own thread, so a per-thread
+# counter belongs to exactly one request.
+_request = threading.local()
+
+
+def reset_request_usage() -> None:
+    """Start counting a new request on this thread from zero."""
+    _request.calls = 0
+    _request.prompt = 0
+    _request.output = 0
+    _request.cache_hit = False
+
+
+def request_usage() -> dict:
+    """Calls, tokens and cache hit for this thread's current request only."""
+    return {
+        "calls": getattr(_request, "calls", 0),
+        "prompt": getattr(_request, "prompt", 0),
+        "output": getattr(_request, "output", 0),
+        "cache_hit": getattr(_request, "cache_hit", False),
+    }
 
 
 class QuotaGuard(Exception):
@@ -140,8 +166,12 @@ def _record_tokens(response) -> None:
         meta = getattr(response, "usage_metadata", None)
         if meta is None:
             return
-        _session_prompt_tokens += int(getattr(meta, "prompt_token_count", 0) or 0)
-        _session_output_tokens += int(getattr(meta, "candidates_token_count", 0) or 0)
+        prompt_tokens = int(getattr(meta, "prompt_token_count", 0) or 0)
+        output_tokens = int(getattr(meta, "candidates_token_count", 0) or 0)
+        _session_prompt_tokens += prompt_tokens
+        _session_output_tokens += output_tokens
+        _request.prompt = getattr(_request, "prompt", 0) + prompt_tokens
+        _request.output = getattr(_request, "output", 0) + output_tokens
     except Exception:
         pass  # accounting never breaks the thing it is accounting for
 
@@ -222,6 +252,7 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
         hit = _cache_read(key)
         if hit is not None:
             _cache_hits += 1
+            _request.cache_hit = True
             return hit
 
     _check_budget()
@@ -233,6 +264,7 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
             client = _get_client()
             _call_times.append(time.monotonic())
             _session_calls += 1
+            _request.calls = getattr(_request, "calls", 0) + 1
 
             kwargs = {"model": config.MODEL, "contents": prompt}
             if system:
