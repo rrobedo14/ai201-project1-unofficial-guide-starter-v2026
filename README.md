@@ -400,6 +400,17 @@ If I rewrote it, Criterion 5 would explicitly check that every chunk object in t
 
 # Unit 3
 
+## What This Extends
+
+This unit extends The Unofficial Guide, the system I built in units 1 and 2.
+It answers questions about campus life from 88 student-written documents: it
+embeds the question locally with `all-MiniLM-L6-v2`, pulls the 5 closest
+chunks from a Chroma index, refuses if the best match is further than 0.6
+away, and otherwise has `gemini-3.5-flash-lite` write an answer from those
+chunks with its sources. It already ran from the command line
+(`python app.py ask "..."`) and had a bare web wrapper, `serve.py`, with `/ask`
+and `/health` routes. Nothing about how it answers changes in this unit.
+
 ## The Shape
 
 I'm taking shape A, deploy and instrument, on the local path (Path B). The Unofficial Guide already answers campus life questions end to end, but it only runs when I start it by hand, and once a question is answered nothing records what happened. I'm adding the operational layer around it: a single documented command that builds the search index if it's missing and starts `serve.py`, a structured log that writes one JSON line per `/ask` request (the question, whether it was answered or refused, the best retrieval distance, how long it took, and the input and output tokens Gemini reports), and a cost per question worked out from those logged tokens rather than guessed. The system's answering behaviour stays the same; what's new is that it can be started from a clean checkout with one command, and every request it handles leaves a record I can measure afterwards.
@@ -410,7 +421,30 @@ I'm taking shape A, deploy and instrument, on the local path (Path B). The Unoff
 - **I'm not hosting it.** I thought about deploying `serve.py` to a free host, since it already listens on `PORT` and `0.0.0.0`. Running locally with a committed log covers the same goals without spending the unit on accounts, secrets and a host's memory limits.
 - **I'm not changing the cache or adding retries.** `generate.py` already caches answers, so a repeated question costs nothing. I'm leaving that as it is and logging when it's hit, rather than tuning it. Retrying failed Gemini calls is hardening (shape B). Either change would move the numbers before I've recorded what the system costs as it is.
 
+## Running It
 
+It runs locally, with logs (Path B). From the project folder, with the virtual
+environment active and a `GEMINI_API_KEY` in `.env`:
+
+```bash
+python serve.py
+```
+
+That one command builds the search index first if there isn't one (a fresh
+clone never has one, because `chroma_db/` is gitignored), then serves on
+`http://localhost:5000`. Every `/ask` request writes one JSON line to
+`logs/requests.jsonl`. To check it's up:
+
+```bash
+curl http://localhost:5000/health
+curl -X POST http://localhost:5000/ask -H "Content-Type: application/json" \
+  -d '{"question": "is the housing lottery random?"}'
+```
+
+The full steps from a clean checkout, and what the environment needs (Python
+3.11.9, the exact package versions in `requirements-lock.txt`, and the 83 MB
+embedding model), are in RUNNING.md under "Capstone Project". I tested those
+steps from fresh clones as criterion 4.
 
 ## Instrumentation
 
@@ -881,8 +915,3 @@ model. The second problem was VS Code saving an old copy of
 `logs/requests.jsonl` over the real file. I stopped running the smoke test and
 started reading the log with `tail` in the terminal.
 
-Claude also wrote the request logging and the one-command start in
-`serve.py`, the token fix in `generate.py`, and first drafts of most of the
-Unit 3 README sections. It ran most of the criterion runs, and sent 6 of the 16
-requests in my recorded session. I chose the project, the shape and path,
-measuring cost in tokens, 5 requests per run, and which fix to make.
