@@ -617,3 +617,88 @@ the 500.
 {"timestamp": "2026-11-18T02:09:37+00:00", "question": "When is the add/drop deadline?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 83.2, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
 {"timestamp": "2026-11-18T02:09:37+00:00", "question": "How much does laundry cost in Innisfree Hall?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 84.8, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
 ```
+
+## Diagnosis
+
+One criterion missed: **criterion 2, logged token counts when requests
+overlap**, at 3/5 in all three runs. The three single requests were right
+every time. The two requests sent at the same moment were wrong every time,
+in exactly the same way:
+
+| Line | `model_calls` | `prompt_tokens` | `output_tokens` | `latency_ms` |
+|---|---|---|---|---|
+| Kestrel Commons, first to finish | 2 | 745 | 196 | 947.8 |
+| Kestrel Commons, second to finish | 2 | 1490 | 379 | 1186.5 |
+
+**Stage: the per-request accounting in `serve.py::ask`.** Retrieval, the gate
+and the model call all worked: both requests got a real answer. What's wrong is
+how the route works out *its own* share of the usage.
+
+**Mechanism: each request measures itself by subtracting session-wide totals,
+and those totals are shared by every request in flight.** `generate.py` keeps
+one running count of calls and tokens for the whole process. `serve.py::ask`
+reads those totals before the pipeline runs, reads them again after, and logs
+the difference. That's only right if nothing else touches the totals in
+between. Flask's development server is threaded by default, so two requests
+that arrive together run at the same time and both change the same counters.
+The exact numbers come from the order in which `generate.py::generate` updates
+them: it adds 1 to the call count *before* sending the request (line 235) and
+adds the tokens only *after* the response comes back (line 242).
+
+- Both requests take their "before" snapshot at zero, and both calls start, so
+  the call count is already up by 2 before either answer arrives.
+- The first answer comes back after 948 ms. Its "after" snapshot sees **2
+  calls** but only its **own 745 tokens**, because the second response hasn't
+  been counted yet.
+- The second comes back after 1,187 ms. By then both responses have been
+  counted, so it logs **2 calls** and **1,490 tokens**, both answers' prompts.
+  Its output of 379 is the first answer's 196 plus its own 183.
+
+So the log claims 4 model calls and 2,235 prompt tokens for two requests that
+really made 2 calls and used 1,490, an overcount of 50% on that pair.
+Criterion 2 assumed each request's usage was its own. The code only guarantees
+that when requests run one at a time.
+
+**Why it didn't show up earlier:** every request in my recorded session (the
+Instrumentation section) and in criteria 1 and 3 was sent one at a time, so the
+before-and-after difference was always just that request. The cost figure in
+What It Costs comes from that one-at-a-time session, so it isn't affected.
+Overlapping requests are the only case that breaks it, and criterion 2 is the
+only test that sent any.
+
+### The pattern
+
+There's only one miss, so there's no pattern *across* misses to find. But
+inside criterion 2 there's no variation at all: 3 runs, 3 overlapping pairs,
+and every pair failed the same way, with both lines logging `model_calls: 2`
+and the second carrying exactly double the prompt tokens (745 → 1,490 every
+time). The nine single requests in those runs were right every time. So it's
+one problem, not three bad runs: the failure is caused by the requests
+overlapping, not by chance, and it will happen every time two requests are in
+flight together. Fixing it means the token counts can't come from shared
+session totals at all: `generate.py` would need to hand back each call's
+usage with its answer.
+
+### The four I met, and whether the targets were low
+
+Criteria 1, 3, 4 and 5 were met in every run. Two of them were met with so
+much room that the targets were set low:
+
+| Criterion | Target | Worst result in 3 runs | Room left |
+|---|---|---|---|
+| 3. Logged latency agrees with curl | within 50 ms | 3.6 ms off | about 14× |
+| 5. Model unreachable fails cleanly | 500 within 10 s | 1.35 s | about 7× |
+| 1. Every request leaves one log line | 5/5 lines, 14 fields | 5/5 | none, but only 5 requests a run |
+| 4. One command from a clean checkout | 3 of 3 clones | 3 of 3 | none |
+
+Criteria 1 and 4 have no slack to remove: one missing line or one clone that
+doesn't start would fail them. Criterion 5's 10 seconds was chosen to catch a
+hang or retry loop, and it did its job, but nothing came close.
+
+**The criterion I'd tighten is criterion 3, from "within 50 ms" to "within
+10 ms" for 5 of 5.** Every gap I measured was between 1.7 and 3.6 ms, which is
+Flask and the local connection and nothing else. A 50 ms window could hide the
+log timer missing real work, such as the time spent writing the log line
+itself or a slow JSON encode, and still pass. 10 ms is still about three times
+the worst gap I saw, so it won't fail on normal noise, but anything the timer
+really leaves out would now show.
