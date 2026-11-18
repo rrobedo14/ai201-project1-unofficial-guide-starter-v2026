@@ -133,3 +133,87 @@ At least 80% of the source documents cited across my final answers carry a publi
      The whole reason the originals stay visible is so someone can see what you
      said before you knew the answer.
      ───────────────────────────────────────────────────────────────────────── -->
+
+
+# Capstone Project — acceptance criteria
+
+The capstone extension is the operational layer around The Unofficial Guide:
+one command that starts it, a structured request log, and a token cost
+measured from that log. Criteria 1–4 are about that new layer. Criterion 5 is
+about the bad path: what happens when the model can't be reached.
+
+## 1. Every request leaves exactly one log line
+
+Across a test session of at least 20 `/ask` requests that includes answered,
+refused, cached and rejected ones, the number of new lines in
+`logs/requests.jsonl` equals the number of requests sent (100%), and every one
+of those lines has all 14 fields: `timestamp`, `question`, `status`,
+`outcome`, `best_distance`, `threshold`, `sources`, `model_calls`,
+`cache_hit`, `prompt_tokens`, `output_tokens`, `cost_usd`, `latency_ms`,
+`error`.
+
+**Why this target:** the log is the only evidence of what the system did, so a
+request that leaves no line is invisible. The ones most likely to go missing
+are the 400s and 500s, the exact requests I'd want to diagnose later. Anything
+under 100% means the record can't be trusted for the requests that matter
+most, and a looser target like "95%" would let the bad path quietly drop out.
+
+## 2. Logged token counts are right, even when requests overlap
+
+Starting with an empty cache (`.cache/` deleted): 10 new in-scope questions
+sent one at a time each log `model_calls: 1` with tokens above 0. The same 10
+sent again each log `cache_hit: true` with 0 tokens. 5 more new questions, sent
+as pairs at the same moment, each log `model_calls: 1`. All 100%.
+
+**Why this target:** my cost number is built straight from these fields, so a
+wrong count makes the cost wrong in a way nobody would notice from the total.
+The counts come from Gemini's own `usage_metadata`, so for one request at a
+time there's no reason to accept less than every line being right. The
+overlapping pairs are the real test: `serve.py` works out each request's
+tokens and model calls by subtracting session-wide totals, so two requests at
+once could mix their counts. If they do, one line shows `model_calls: 2` and
+the other `0`, which anyone can see in the log without a baseline to compare
+against.
+
+## 3. Logged latency agrees with what the caller waited
+
+Send 20 requests one at a time, each timed from outside with
+`curl -w "%{time_total}"`, so request *n* matches the *n*th new log line. The
+logged `latency_ms` is within 50 ms of the time curl measured for at least 18
+of the 20.
+
+**Why this target:** `latency_ms` is timed inside the route, so it leaves out
+Flask's own handling and the trip to and from the client. On my laptop that
+overhead should be a few milliseconds, so 50 ms is room for it without hiding a
+real gap. A percentage target wouldn't work here: a cached answer takes about
+30 ms, so even 10% would be a 3 ms window. I allow 2 misses in 20 for one-off
+startup work, like the embedding model loading on the first search.
+
+## 4. One command starts it from a clean checkout
+
+In 3 out of 3 fresh clones, following only the "Capstone Project" steps in
+`RUNNING.md`, `python serve.py` builds the index, `/health` returns
+`"index_ready": true`, and the question "is the housing lottery random?" gets a
+200 with an answer, with no step that isn't written in `RUNNING.md`.
+
+**Why this target:** `chroma_db/` is gitignored, so before this extension a
+fresh clone started a server that failed or refused every question. That's the
+exact gap the one-command start exists to close. It's 3 of 3 rather than 2 of 3
+because a start command that only sometimes works isn't one command; anyone
+who hit the failing run would be back to guessing which step was missing.
+
+## 5. When the model can't be reached, the request fails cleanly and is logged
+
+With the server started as `GEMINI_API_KEY=invalid python serve.py`, 5 out of 5
+in-scope questions that aren't in the cache return a 500 within 10 seconds, and
+each is logged with `"outcome": "error"`, a non-null `error` field and 0
+tokens.
+
+**Why this target:** the model call is the only part of my system that leaves
+my laptop, so it's the part most likely to fail: a revoked key, an expired
+quota, or no internet. In my recorded session that path never ran, so the
+`error` outcome is code I've never seen work. 10 seconds is the limit because
+`generate.py` retries only on rate limits, with backoff, and an invalid key
+shouldn't be retried at all, so anything slower means it's waiting on something
+it shouldn't. 5 of 5 because a failure that's logged only some of the time is
+the worst kind: the record would look clean exactly when it isn't.
