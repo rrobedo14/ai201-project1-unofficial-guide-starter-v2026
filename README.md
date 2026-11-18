@@ -396,3 +396,16 @@ I would rewrite Criterion 5 ("Pre-AI context generation") to measure the payload
 As written, Criterion 5 conflated an upstream data pipeline requirement (injecting metadata into chunks) with a generation capability. Because the criterion relied on whether the model could see or process publication dates, it forced me into a confusing loop of trying to fix missing data structures with prompt instructions.
 
 If I rewrote it, Criterion 5 would explicitly check that every chunk object in the final prompt payload contains a populated metadata dictionary or formatted header before the API call is ever made. That way, a missing date would fail an automated pre-flight assertion instantly, saving an afternoon of chasing ghost fixes in the prompt text.
+
+
+# Unit 3
+
+## The Shape
+
+I'm taking shape A, deploy and instrument, on the local path (Path B). The Unofficial Guide already answers campus life questions end to end, but it only runs when I start it by hand, and once a question is answered nothing records what happened. I'm adding the operational layer around it: a single documented command that builds the search index if it's missing and starts `serve.py`, a structured log that writes one JSON line per `/ask` request (the question, whether it was answered or refused, the best retrieval distance, how long it took, and the input and output tokens Gemini reports), and a cost per question worked out from those logged tokens rather than guessed. The system's answering behaviour stays the same; what's new is that it can be started from a clean checkout with one command, and every request it handles leaves a record I can measure afterwards.
+
+**Out of scope**
+
+- **I'm not fixing the missing publication dates.** Criterion 5 from unit 2 failed because chunks don't carry their dates, and I already know the fix is in ingestion. But that's a new capability (shape C), not instrumentation, and it would change the answers I'm trying to measure. It stays in What's Still Broken.
+- **I'm not hosting it.** I thought about deploying `serve.py` to a free host, since it already listens on `PORT` and `0.0.0.0`. Running locally with a committed log covers the same goals without spending the unit on accounts, secrets and a host's memory limits.
+- **I'm not changing the cache or adding retries.** `generate.py` already caches answers, so a repeated question costs nothing. I'm leaving that as it is and logging when it's hit, rather than tuning it. Retrying failed Gemini calls is hardening (shape B). Either change would move the numbers before I've recorded what the system costs as it is.
