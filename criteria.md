@@ -144,10 +144,10 @@ about the bad path: what happens when the model can't be reached.
 
 ## 1. Every request leaves exactly one log line
 
-Across a test session of at least 20 `/ask` requests that includes answered,
-refused, cached and rejected ones, the number of new lines in
-`logs/requests.jsonl` equals the number of requests sent (100%), and every one
-of those lines has all 14 fields: `timestamp`, `question`, `status`,
+In each run of 5 `/ask` requests (one answered, one cached repeat, one
+refused, and two rejected inputs), the number of new lines in
+`logs/requests.jsonl` is 5 (100%), and every one of those lines has all 14
+fields: `timestamp`, `question`, `status`,
 `outcome`, `best_distance`, `threshold`, `sources`, `model_calls`,
 `cache_hit`, `prompt_tokens`, `output_tokens`, `cost_usd`, `latency_ms`,
 `error`.
@@ -160,10 +160,11 @@ most, and a looser target like "95%" would let the bad path quietly drop out.
 
 ## 2. Logged token counts are right, even when requests overlap
 
-Starting with an empty cache (`.cache/` deleted): 10 new in-scope questions
-sent one at a time each log `model_calls: 1` with tokens above 0. The same 10
-sent again each log `cache_hit: true` with 0 tokens. 5 more new questions, sent
-as pairs at the same moment, each log `model_calls: 1`. All 100%.
+In each run of 5 requests, starting with an empty cache (`.cache/` deleted): 2
+new in-scope questions sent one at a time each log `model_calls: 1` with tokens
+above 0, an exact repeat logs `cache_hit: true` with 0 tokens, and one new
+question sent twice at the same moment logs `model_calls: 1` on both lines.
+5 of 5 (100%).
 
 **Why this target:** my cost number is built straight from these fields, so a
 wrong count makes the cost wrong in a way nobody would notice from the total.
@@ -171,23 +172,25 @@ The counts come from Gemini's own `usage_metadata`, so for one request at a
 time there's no reason to accept less than every line being right. The
 overlapping pairs are the real test: `serve.py` works out each request's
 tokens and model calls by subtracting session-wide totals, so two requests at
-once could mix their counts. If they do, one line shows `model_calls: 2` and
-the other `0`, which anyone can see in the log without a baseline to compare
-against.
+once could mix their counts. If they do, a line shows `model_calls: 2`, which
+anyone can see in the log without a baseline to compare against.
 
 ## 3. Logged latency agrees with what the caller waited
 
-Send 20 requests one at a time, each timed from outside with
-`curl -w "%{time_total}"`, so request *n* matches the *n*th new log line. The
-logged `latency_ms` is within 50 ms of the time curl measured for at least 18
-of the 20.
+In each run, send 5 requests one at a time (2 new, 1 repeat, 1 refused, 1
+rejected), each timed from outside with `curl -w "%{time_total}"`, so request
+*n* matches the *n*th new log line. The logged `latency_ms` is within 50 ms of
+the time curl measured for 5 of 5.
 
 **Why this target:** `latency_ms` is timed inside the route, so it leaves out
 Flask's own handling and the trip to and from the client. On my laptop that
 overhead should be a few milliseconds, so 50 ms is room for it without hiding a
 real gap. A percentage target wouldn't work here: a cached answer takes about
-30 ms, so even 10% would be a 3 ms window. I allow 2 misses in 20 for one-off
-startup work, like the embedding model loading on the first search.
+30 ms, so even 10% would be a 3 ms window. Across three runs that's 15
+measurements covering every kind of request, enough to see the spread rather
+than one number. I allow no misses: the only overhead outside the timer is
+Flask and the local network, which is a few milliseconds every time, so even
+one request 50 ms off would mean the timer is missing real work.
 
 ## 4. One command starts it from a clean checkout
 

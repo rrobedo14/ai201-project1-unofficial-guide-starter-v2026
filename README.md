@@ -503,3 +503,117 @@ Two things the numbers show:
 
 Embeddings run locally (`all-MiniLM-L6-v2` through Chroma) and use no API
 tokens.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Every request leaves exactly one log line | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Logged token counts are right, even when requests overlap | 5 of 5 | 3/5 | 3/5 | 3/5 | MISSED |
+| 3. Logged latency agrees with what the caller waited | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. One command starts it from a clean checkout | 3 of 3 clones | 1/1 | 1/1 | 1/1 | MET |
+| 5. When the model can't be reached, the request fails cleanly and is logged | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+### Real output from Run 1
+
+Every log line below is copied unedited from `logs/requests.jsonl`. Each one is
+written by `serve.py::ask`, which builds the entry, and `serve.py::_log_request`,
+which appends it to the file.
+
+**Criterion 1, Run 1:** 5 requests, 5 log lines, every one with all 14 fields
+(answered, cached repeat, refused, and two rejected inputs).
+
+```json
+{"timestamp": "2026-11-18T01:58:36+00:00", "question": "What is the deadline to withdraw from a class?", "status": 200, "outcome": "answered", "best_distance": 0.3836, "threshold": 0.6, "sources": ["admin_add_drop_deadline.txt", "admin_grade_appeals.txt", "admin_pass_fail_option.txt", "admin_withdrawal_deadline.txt", "course_stat_150.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 603, "output_tokens": 76, "cost_usd": null, "latency_ms": 641.2, "error": null}
+{"timestamp": "2026-11-18T01:58:37+00:00", "question": "What is the deadline to withdraw from a class?", "status": 200, "outcome": "answered", "best_distance": 0.3836, "threshold": 0.6, "sources": ["admin_add_drop_deadline.txt", "admin_grade_appeals.txt", "admin_pass_fail_option.txt", "admin_withdrawal_deadline.txt", "course_stat_150.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 36.7, "error": null}
+{"timestamp": "2026-11-18T01:58:38+00:00", "question": "What is the capital of Mongolia?", "status": 200, "outcome": "refused", "best_distance": 0.8246, "threshold": 0.6, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 35.8, "error": null}
+{"timestamp": "2026-11-18T01:58:38+00:00", "question": null, "status": 400, "outcome": "bad_request", "best_distance": null, "threshold": null, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 0.1, "error": null}
+{"timestamp": "2026-11-18T01:58:39+00:00", "question": null, "status": 400, "outcome": "bad_request", "best_distance": null, "threshold": null, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 0.1, "error": null}
+```
+
+**Criterion 2, Run 1:** the first three lines are right. The last two are the
+same question sent at the same moment: both log `model_calls: 2`, and the
+second has exactly double the tokens (745 → 1490), so 3/5.
+
+```json
+{"timestamp": "2026-11-18T02:05:46+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 596, "output_tokens": 172, "cost_usd": null, "latency_ms": 1982.3, "error": null}
+{"timestamp": "2026-11-18T02:05:54+00:00", "question": "How does study abroad work?", "status": 200, "outcome": "answered", "best_distance": 0.5185, "threshold": 0.6, "sources": ["admin_campus_jobs_and_financial_aid.txt", "admin_graduation_requirements.txt", "admin_study_abroad.txt", "course_engl_205_exams.txt", "money_jobs.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 535, "output_tokens": 88, "cost_usd": null, "latency_ms": 725.7, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 36.5, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 2, "cache_hit": false, "prompt_tokens": 745, "output_tokens": 196, "cost_usd": null, "latency_ms": 947.8, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 2, "cache_hit": false, "prompt_tokens": 1490, "output_tokens": 379, "cost_usd": null, "latency_ms": 1186.5, "error": null}
+```
+
+**Criterion 3, Run 1:** the five log lines, then what `curl -w "%{time_total}"`
+measured for the same five requests, sent one at a time.
+
+```json
+{"timestamp": "2026-11-18T02:06:08+00:00", "question": "What is the Atrium dining hall like?", "status": 200, "outcome": "answered", "best_distance": 0.4877, "threshold": 0.6, "sources": ["dining_pellew_dining_hall.txt", "dining_pellew_dining_hall_followup.txt", "dining_the_atrium.txt", "dining_the_atrium_followup.txt", "housing_aldridge_hall.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 778, "output_tokens": 158, "cost_usd": null, "latency_ms": 804.9, "error": null}
+{"timestamp": "2026-11-18T02:06:15+00:00", "question": "Is STAT 150 hard?", "status": 200, "outcome": "answered", "best_distance": 0.4416, "threshold": 0.6, "sources": ["course_phys_130.txt", "course_phys_130_exams.txt", "course_stat_150.txt", "course_stat_150_exams.txt", "course_stat_150_workload.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 605, "output_tokens": 175, "cost_usd": null, "latency_ms": 1146.7, "error": null}
+{"timestamp": "2026-11-18T02:06:22+00:00", "question": "What is the Atrium dining hall like?", "status": 200, "outcome": "answered", "best_distance": 0.4877, "threshold": 0.6, "sources": ["dining_pellew_dining_hall.txt", "dining_pellew_dining_hall_followup.txt", "dining_the_atrium.txt", "dining_the_atrium_followup.txt", "housing_aldridge_hall.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 37.9, "error": null}
+{"timestamp": "2026-11-18T02:06:22+00:00", "question": "What is the capital of Mongolia?", "status": 200, "outcome": "refused", "best_distance": 0.8246, "threshold": 0.6, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 38.4, "error": null}
+{"timestamp": "2026-11-18T02:06:22+00:00", "question": null, "status": 400, "outcome": "bad_request", "best_distance": null, "threshold": null, "sources": [], "model_calls": 0, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 0.1, "error": null}
+```
+
+| Request | `latency_ms` (log) | curl `time_total` | Gap |
+|---|---|---|---|
+| Atrium dining hall (new) | 804.9 | 806.8 | 1.9 |
+| STAT 150 (new) | 1146.7 | 1149.3 | 2.6 |
+| Atrium dining hall (repeat, cached) | 37.9 | 40.5 | 2.6 |
+| Capital of Mongolia (refused) | 38.4 | 41.1 | 2.7 |
+| Empty question (rejected) | 0.1 | 2.7 | 2.6 |
+
+**Criterion 4:** a fresh clone started with `python serve.py`, following
+RUNNING.md. Each clone writes to its own log and is deleted afterwards (its
+`.env` holds the API key), and the three runs recorded only the status codes.
+So this output is from one more clone, made the same way, to capture the
+actual responses.
+
+Startup, printed by `serve.py::main`, which calls `app.py::cmd_index` because
+the clone has no index:
+
+```
+No search index yet. Building it before the server starts.
+
+Corpus: campus_life
+  loaded   88 documents, 27,908 characters, ~317 characters per document
+  chunked  88 chunks, 317 characters on average (shortest 178, longest 549), produced by chunker.py::split_documents
+  embedding 88 chunks (first run downloads the model)...
+  stored   88 chunks in 2.0s
+
+Ready. Try: python app.py ask "your question here"
+
+Request log: <clone folder>\logsequests.jsonl
+Serving The Unofficial Guide on http://localhost:5099
+```
+
+`GET /health`, from `serve.py::health`:
+
+```json
+{"corpus":"campus_life","detail":"ready","index_ready":true,"status":"ok"}
+```
+
+`POST /ask` with "is the housing lottery random?", from `serve.py::ask`:
+
+```json
+{"answer":"Temporal breakdown of the provided sources: 2 sources are pre-2022, and 1 source is 2022 or later (based on the provided filenames/content).\n\nThe housing lottery is not entirely random: rising sophomores get a number drawn at random, but juniors and seniors are ordered by accumulated credit hours first, with random tie-breaking used only as a secondary measure (admin_housing_lottery.txt).","best_distance":0.2541,"corpus":"campus_life","question":"is the housing lottery random?","refused":false,"sources":["admin_housing_lottery.txt","admin_parking_permits.txt","advising_registration.txt","housing_morrow_house.txt","housing_tamsin_court.txt"],"threshold":0.6}
+
+HTTP 200
+```
+
+The log line it wrote in the clone's `logs/requests.jsonl`:
+
+```json
+{"timestamp": "2026-11-18T02:24:36+00:00", "question": "is the housing lottery random?", "status": 200, "outcome": "answered", "best_distance": 0.2541, "threshold": 0.6, "sources": ["admin_housing_lottery.txt", "admin_parking_permits.txt", "advising_registration.txt", "housing_morrow_house.txt", "housing_tamsin_court.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 679, "output_tokens": 91, "cost_usd": null, "latency_ms": 2023.6, "error": null}
+```
+
+**Criterion 5, Run 1:** server started as `GEMINI_API_KEY=invalid python serve.py`.
+All 5 returned a 500 in 0.08–1.32 s, each logged with `"outcome": "error"`, the
+error from Google, and 0 tokens. The error itself is raised in
+`generate.py::generate`, and `serve.py::ask` catches it, logs it and returns
+the 500.
+
+```json
+{"timestamp": "2026-11-18T02:09:35+00:00", "question": "Is Old Brewhouse noisy?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 1314.2, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
+{"timestamp": "2026-11-18T02:09:36+00:00", "question": "What is Verrill Street Grill like?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 80.7, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
+{"timestamp": "2026-11-18T02:09:36+00:00", "question": "Is Tamsin Court a good place to live?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 86.9, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
+{"timestamp": "2026-11-18T02:09:37+00:00", "question": "When is the add/drop deadline?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 83.2, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
+{"timestamp": "2026-11-18T02:09:37+00:00", "question": "How much does laundry cost in Innisfree Hall?", "status": 500, "outcome": "error", "best_distance": null, "threshold": null, "sources": [], "model_calls": 1, "cache_hit": false, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 84.8, "error": "ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'API_KEY_INVALID', 'domain': 'googleapis.com', 'metadata': {'service': 'generativelanguage.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.LocalizedMessage', 'locale': 'en-US', 'message': 'API key not valid. Please pass a valid API key.'}]}}"}
+```
