@@ -472,9 +472,11 @@ dollars (see below), so no price is set in `.env`.
 
 **Method.** Gemini returns token counts on every response
 (`usage_metadata.prompt_token_count` for input and `candidates_token_count`
-for output). `generate.py` adds them to session totals, and `serve.py::ask`
-takes the before-and-after difference for each request and logs it as
-`prompt_tokens` and `output_tokens`. These are measured counts from the
+for output). `generate.py` adds them to a counter for the request that made
+the call, and `serve.py::ask` logs that request's totals as `prompt_tokens`
+and `output_tokens`. (Before the fix in The Improvement, it took the change in
+session-wide totals instead; that was right for one request at a time, which is
+how the session below was sent.) These are measured counts from the
 service, not estimates from the prompt length. I also checked for hidden
 thinking tokens: a test call reported `thoughts_token_count: None`, and the
 total equalled input plus output, so the logged counts are everything the
@@ -503,6 +505,20 @@ Two things the numbers show:
 
 Embeddings run locally (`all-MiniLM-L6-v2` through Chroma) and use no API
 tokens.
+
+**Checked against a bigger sample.** The after-fix criterion runs (see The
+Improvement) made 21 more model calls: 13,821 tokens in and 3,341 out, so
+17,162 in total, an average of 817 per call (range 628–998). They
+average higher than the session above because their answers ran longer. Across
+all 29 measured calls: 5,912 + 17,162 = 23,074 tokens ÷ 29 calls =
+**about 796 tokens per question that reaches the model.** That's the per-run
+number I'd use.
+
+**For a hundred people a day:** if each person asks 5 questions and none of
+them are cached or refused (the most expensive case), that's 100 × 5 = 500
+questions a day, and 500 × 796 = **398,000 tokens a day**, which is about
+11.9 million tokens over a 30-day month. Any refused or repeated
+question costs 0, so real traffic would come in under this.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
@@ -580,7 +596,8 @@ Corpus: campus_life
 
 Ready. Try: python app.py ask "your question here"
 
-Request log: <clone folder>\logsequests.jsonl
+Request log: <clone folder>\logs
+equests.jsonl
 Serving The Unofficial Guide on http://localhost:5099
 ```
 
@@ -808,3 +825,64 @@ gap to curl didn't change.
 - **The cost is a little more code to keep right.** Usage is now counted in
   two places in `generate.py`, the session totals and the per-request counter,
   and anything that adds a new kind of usage has to update both.
+
+## What's Still Broken (Capstone)
+
+**No criterion is still missed.** After the fix, all five were met in all
+three runs. That doesn't mean nothing is broken:
+
+- **Criterion 3's target was set too low.** Every gap between the logged
+  latency and curl's was 1.7–3.6 ms, against a 50 ms allowance, about 14 times
+  more room than it ever used. I'd tighten it to **within 10 ms for 5 of 5**:
+  still about three times the worst gap I measured, but tight enough that
+  anything the timer leaves out, such as the time spent writing the log line
+  itself, would show.
+- **Two requests finishing at the same instant can corrupt the log.** Testing
+  the fix, I sent pairs that finished at exactly the same moment, and in 7 of 20
+  the two log lines overwrote part of each other, leaving invalid JSON.
+  `serve.py::_log_request` appends to the file from two threads with nothing
+  making them take turns. What I'd do: put a lock around the write, about three
+  lines, and add a criterion that fires pairs at the same instant and checks
+  every line still parses. Why I stopped: the brief asked for one improvement,
+  and the token counting was the one my diagnosis pointed at. None of my five
+  criteria caught this, because none of them sent requests that finished
+  together.
+- **Criterion 5 tests a rejected request, not an unreachable one.** Its title
+  says the model "can't be reached," but the test uses an invalid key, so
+  Google answers quickly with an error. A true outage (no internet, a hung
+  connection) never got tested, and that's the case where a request could hang
+  rather than fail. Why I stopped: testing it means cutting the network on
+  purpose partway through a request, and it wasn't the miss my diagnosis
+  pointed at.
+
+## What I'd Do Next
+
+If this were real, the first thing I'd do is fix the log-write collision and
+add a criterion that fires requests at the same instant. The log is the only
+record this system keeps of what it did, and it currently fails silently
+exactly when traffic overlaps, which is the moment a real service would most
+need it.
+
+
+## How I Used AI (Capstone)
+
+**1.** I asked Claude to check my five criteria against the self-check list.
+It found that criterion 2 claimed to catch overlapping requests mixing their
+token counts, but the test never sent overlapping requests, and its check was
+circular because it used the log to decide what the log should say. I changed
+the test to send two identical requests at the same moment. That change is
+what caught the real bug: the second request logged double the tokens.
+
+**2.** When I tested the system, everything started getting refused, and later
+my log kept going back to 16 lines. Claude traced the first problem to
+`tools/smoke_test.py`, a staff tool it had told me to run, which rebuilt my
+real search index with fake embeddings. It rebuilt the index with the real
+model. The second problem was VS Code saving an old copy of
+`logs/requests.jsonl` over the real file. I stopped running the smoke test and
+started reading the log with `tail` in the terminal.
+
+Claude also wrote the request logging and the one-command start in
+`serve.py`, the token fix in `generate.py`, and first drafts of most of the
+Unit 3 README sections. It ran most of the criterion runs, and sent 6 of the 16
+requests in my recorded session. I chose the project, the shape and path,
+measuring cost in tokens, 5 requests per run, and which fix to make.
