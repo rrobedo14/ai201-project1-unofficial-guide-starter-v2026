@@ -73,6 +73,22 @@ CACHE_ENABLED = os.getenv("AI201_CACHE", "1") != "0"
 CACHE_DIR = ROOT / ".cache"
 
 
+# ─── Request log and cost (unit 3) ───────────────────────────────────────────
+# serve.py writes one JSON line per /ask request here.
+REQUEST_LOG = ROOT / "logs" / "requests.jsonl"
+
+# Price of the generation model, in US dollars per million tokens. Copy these
+# from Google's Gemini pricing page for the model named in MODEL above. Left
+# unset, the log still records every token, and cost_usd is null rather than
+# a made-up number.
+def _price(name: str) -> float | None:
+    value = os.getenv(name, "").strip()
+    return float(value) if value else None
+
+PRICE_INPUT_PER_M = _price("AI201_PRICE_INPUT_PER_M")
+PRICE_OUTPUT_PER_M = _price("AI201_PRICE_OUTPUT_PER_M")
+
+
 # ─── Paths ───────────────────────────────────────────────────────────────────
 
 CORPORA_DIR = ROOT / "corpora"

@@ -20,20 +20,47 @@ Why this exists: `app.py` runs once and exits, which is fine on your laptop
 and impossible to deploy. A hosted service has to stay up and wait for
 requests. This is the smallest thing that does that.
 
-⚠️ There is deliberately no logging, no timing and no metrics in this file.
-Unit 9 has you build the structured log yourself — the request line, the
-timing field everyone skips, the whole instrument-before-you-deploy exercise.
-Shipping a logger here would hand you the answer to that. Add yours in unit 9;
-this file stays the bare shell until then.
+Unit 3 adds two things and nothing else:
+
+    - every /ask writes one JSON line to logs/requests.jsonl: the question,
+      the outcome, best distance, latency, tokens, cache hit and cost
+    - `python serve.py` builds the search index first if there isn't one, so
+      a clean checkout starts with one command
 """
 
+import json
 import os
+import time
+from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 
 import config
 
 app = Flask(__name__)
+
+
+# ─── Request log (unit 3) ────────────────────────────────────────────────────
+
+def _cost(prompt_tokens: int, output_tokens: int) -> float | None:
+    """Dollars for one request, from the tokens Gemini reported. None if no price is set."""
+    if config.PRICE_INPUT_PER_M is None or config.PRICE_OUTPUT_PER_M is None:
+        return None
+    return round(
+        prompt_tokens / 1e6 * config.PRICE_INPUT_PER_M
+        + output_tokens / 1e6 * config.PRICE_OUTPUT_PER_M,
+        8,
+    )
+
+
+def _log_request(entry: dict) -> None:
+    """Append one request to the log. A logging failure never fails the request."""
+    try:
+        config.REQUEST_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with config.REQUEST_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as exc:  # noqa: BLE001
+        print(f"!! could not write request log: {exc}")
 
 
 @app.get("/health")
@@ -72,11 +99,41 @@ def ask():
     `"refused": true` so whatever calls this can tell the two apart.
     """
     from app import ask_pipeline
+    import generate
 
-    payload = request.get_json(silent=True) or {}
-    question = (payload.get("question") or "").strip()
+    started = time.perf_counter()
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "question": None,
+        "status": None,
+        "outcome": None,          # answered / refused / bad_request / error
+        "best_distance": None,
+        "threshold": None,
+        "sources": [],
+        "model_calls": 0,
+        "cache_hit": False,
+        "prompt_tokens": 0,
+        "output_tokens": 0,
+        "cost_usd": None,
+        "latency_ms": None,
+        "error": None,
+    }
+
+    def finish(status: int, outcome: str) -> None:
+        entry["status"] = status
+        entry["outcome"] = outcome
+        entry["latency_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        _log_request(entry)
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    raw = payload.get("question")
+    question = raw.strip() if isinstance(raw, str) else ""
+    entry["question"] = question or None
 
     if not question:
+        finish(400, "bad_request")
         return (
             jsonify(
                 {
@@ -87,10 +144,34 @@ def ask():
             400,
         )
 
+    # generate.py keeps running totals for the session; this request's share
+    # is the difference before and after. (Fine for one local user; two
+    # requests at the same moment would blur each other's counts.)
+    tokens_before = generate.token_counts()
+    calls_before = generate.call_count()
+    hits_before = generate._cache_hits
+
+    def record_usage() -> None:
+        tokens_after = generate.token_counts()
+        entry["prompt_tokens"] = tokens_after["prompt"] - tokens_before["prompt"]
+        entry["output_tokens"] = tokens_after["output"] - tokens_before["output"]
+        entry["model_calls"] = generate.call_count() - calls_before
+        entry["cache_hit"] = generate._cache_hits > hits_before
+        entry["cost_usd"] = _cost(entry["prompt_tokens"], entry["output_tokens"])
+
     try:
         outcome = ask_pipeline(question, corpus=config.CORPUS)
     except Exception as exc:  # noqa: BLE001 — a reader gets this, not a traceback
+        record_usage()
+        entry["error"] = f"{type(exc).__name__}: {exc}"
+        finish(500, "error")
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    record_usage()
+    entry["best_distance"] = round(outcome["best_distance"], 4)
+    entry["threshold"] = outcome["threshold"]
+    entry["sources"] = outcome["sources"]
+    finish(200, "refused" if outcome["refused"] else "answered")
 
     return jsonify(
         {
@@ -119,6 +200,19 @@ def main():
     # strangers can reach it. Off unless you ask for it.
     debug = os.getenv("AI201_DEBUG", "0") == "1"
 
+    # Unit 3: one command from a clean checkout. chroma_db/ is gitignored, so a
+    # fresh clone has no index and every /ask would fail. Build it first.
+    from store import index_exists
+
+    if not index_exists(config.CORPUS):
+        import argparse
+        from app import cmd_index
+
+        print("No search index yet. Building it before the server starts.\n")
+        cmd_index(argparse.Namespace(corpus=config.CORPUS, variant="default"))
+        print()
+
+    print(f"Request log: {config.REQUEST_LOG}")
     print(f"Serving The Unofficial Guide on http://localhost:{port}")
     print(f"Corpus: {config.CORPUS}    (Ctrl-C to stop)\n")
     print("Try it from another terminal:\n")
