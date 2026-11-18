@@ -702,3 +702,109 @@ log timer missing real work, such as the time spent writing the log line
 itself or a slow JSON encode, and still pass. 10 ms is still about three times
 the worst gap I saw, so it won't fail on normal noise, but anything the timer
 really leaves out would now show.
+
+
+## The Improvement
+
+**What I changed:** each request now counts its own usage, instead of working
+it out from shared session totals. In `generate.py`, a per-thread counter
+(`threading.local()`) records the calls, tokens and cache hit for the request
+running on that thread, alongside the existing session totals.
+`generate.py::reset_request_usage` starts it at zero and
+`generate.py::request_usage` reads it back. `serve.py::ask` now calls those two
+instead of subtracting `generate.token_counts()` before and after. Commit
+`65f74fd`, two files, nothing else changed.
+
+**Which diagnosis it follows:** the criterion 2 miss. The diagnosis said the
+stage was the per-request accounting in `serve.py::ask`, and the mechanism was
+that it measured each request as the change in totals that every request in
+flight shares. Flask runs each request on its own thread, so a per-thread
+counter belongs to exactly one request, whichever finishes first.
+
+**Why not a lock:** making `/ask` handle one request at a time would also stop
+the counts mixing, but by queueing requests, which would slow the route and
+change what criterion 3 measures. The per-thread counter fixes the accounting
+without changing how requests run.
+
+### Before and after, side by side
+
+Same five criteria, same 5 requests per run, 3 runs each. Before is commit
+`90425f9`; after is commit `65f74fd`.
+
+| Criterion | Target | Before: Run 1 · 2 · 3 | Before | After: Run 1 · 2 · 3 | After |
+|---|---|---|---|---|---|
+| 1. Every request leaves exactly one log line | 5 of 5 | 5/5 · 5/5 · 5/5 | MET | 5/5 · 5/5 · 5/5 | MET |
+| 2. Logged token counts are right, even when requests overlap | 5 of 5 | 3/5 · 3/5 · 3/5 | **MISSED** | 5/5 · 5/5 · 5/5 | **MET** |
+| 3. Logged latency agrees with what the caller waited | 5 of 5 | 5/5 · 5/5 · 5/5 | MET | 5/5 · 5/5 · 5/5 | MET |
+| 4. One command starts it from a clean checkout | 3 of 3 clones | 1/1 · 1/1 · 1/1 | MET | 1/1 · 1/1 · 1/1 | MET |
+| 5. When the model can't be reached, the request fails cleanly and is logged | 5 of 5 | 5/5 · 5/5 · 5/5 | MET | 5/5 · 5/5 · 5/5 | MET |
+
+The overlapping pair in criterion 2, Run 1:
+
+| | `model_calls` before | tokens before | `model_calls` after | tokens after |
+|---|---|---|---|---|
+| First to finish | 2 | 745 + 196 | 1 | 745 + 195 |
+| Second to finish | 2 | **1490** + 379 | 1 | **745** + 234 |
+
+Criterion 2, Run 1, **before**, from `logs/requests.jsonl` (written by
+`serve.py::ask`):
+
+```json
+{"timestamp": "2026-11-18T02:05:46+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 596, "output_tokens": 172, "cost_usd": null, "latency_ms": 1982.3, "error": null}
+{"timestamp": "2026-11-18T02:05:54+00:00", "question": "How does study abroad work?", "status": 200, "outcome": "answered", "best_distance": 0.5185, "threshold": 0.6, "sources": ["admin_campus_jobs_and_financial_aid.txt", "admin_graduation_requirements.txt", "admin_study_abroad.txt", "course_engl_205_exams.txt", "money_jobs.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 535, "output_tokens": 88, "cost_usd": null, "latency_ms": 725.7, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 36.5, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 2, "cache_hit": false, "prompt_tokens": 745, "output_tokens": 196, "cost_usd": null, "latency_ms": 947.8, "error": null}
+{"timestamp": "2026-11-18T02:06:01+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 2, "cache_hit": false, "prompt_tokens": 1490, "output_tokens": 379, "cost_usd": null, "latency_ms": 1186.5, "error": null}
+```
+
+Criterion 2, Run 1, **after**:
+
+```json
+{"timestamp": "2026-11-18T02:39:03+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 596, "output_tokens": 120, "cost_usd": null, "latency_ms": 940.3, "error": null}
+{"timestamp": "2026-11-18T02:39:10+00:00", "question": "How does study abroad work?", "status": 200, "outcome": "answered", "best_distance": 0.5185, "threshold": 0.6, "sources": ["admin_campus_jobs_and_financial_aid.txt", "admin_graduation_requirements.txt", "admin_study_abroad.txt", "course_engl_205_exams.txt", "money_jobs.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 535, "output_tokens": 121, "cost_usd": null, "latency_ms": 942.2, "error": null}
+{"timestamp": "2026-11-18T02:39:17+00:00", "question": "Is ECON 101 hard?", "status": 200, "outcome": "answered", "best_distance": 0.3741, "threshold": 0.6, "sources": ["course_econ_101.txt", "course_econ_101_exams.txt", "course_econ_101_workload.txt", "course_phys_130.txt", "course_phys_130_exams.txt"], "model_calls": 0, "cache_hit": true, "prompt_tokens": 0, "output_tokens": 0, "cost_usd": null, "latency_ms": 32.7, "error": null}
+{"timestamp": "2026-11-18T02:39:17+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 745, "output_tokens": 195, "cost_usd": null, "latency_ms": 985.1, "error": null}
+{"timestamp": "2026-11-18T02:39:17+00:00", "question": "What is Kestrel Commons like?", "status": 200, "outcome": "answered", "best_distance": 0.5221, "threshold": 0.6, "sources": ["dining_kestrel_commons.txt", "dining_kestrel_commons_followup.txt", "dining_north_kitchen.txt", "transit_shuttle.txt", "transit_walking.txt"], "model_calls": 1, "cache_hit": false, "prompt_tokens": 745, "output_tokens": 234, "cost_usd": null, "latency_ms": 1121.3, "error": null}
+```
+
+The latency check on the same change, criterion 3:
+
+| | Gap between logged and curl time | Model-call `latency_ms` |
+|---|---|---|
+| Before | 1.7–3.6 ms | 805–1,147 ms |
+| After | 1.7–2.3 ms | 825–1,740 ms |
+
+### Did it help?
+
+**Yes, for what it was aimed at.** Criterion 2 went from 3/5 in every run to
+5/5 in every run. Both overlapping requests now log `model_calls: 1` and their
+own 745 prompt tokens, and their output tokens differ (195 and 234), because
+each line counts only its own answer. The overcount on an overlapping pair is
+gone: the log now shows 2 calls and 1,490 prompt tokens for 2 calls that used
+1,490, not 4 calls and 2,235.
+
+**Nothing I measured got worse.** Criteria 1, 3, 4 and 5 were met in every run
+before and after. The logged-versus-curl gap stayed at about 2 ms, so the
+change didn't slow the route or move its timer. The model-call times moved
+around (up to 1,740 ms in one after-run), but that's Gemini's own response
+time varying, not the fix: those requests are timed inside the route, and the
+gap to curl didn't change.
+
+**What it didn't fix, and what it cost:**
+
+- **Overlapping requests can still damage the log itself.** While testing
+  the fix I sent pairs of requests that finished at exactly the same moment.
+  The token counts were right in every one, but in 7 of 20 pairs the two log
+  lines were written at the same instant and overwrote part of each other,
+  leaving a line that isn't valid JSON. That's a different problem from the one
+  I fixed: `serve.py::_log_request` appends to the file from two threads with
+  nothing making them take turns. It was there before the change too. My
+  criteria didn't catch it, because in real runs the paired answers finished
+  hundreds of milliseconds apart. Criterion 1 only ever sent one request at a
+  time.
+- **`model_calls` still counts attempts, not answers.** A request that hits a
+  rate limit and retries logs one call per attempt. The fix keeps that
+  behaviour; it only stops one request counting another's attempts.
+- **The cost is a little more code to keep right.** Usage is now counted in
+  two places in `generate.py`, the session totals and the per-request counter,
+  and anything that adds a new kind of usage has to update both.
