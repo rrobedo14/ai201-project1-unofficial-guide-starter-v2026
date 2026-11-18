@@ -274,10 +274,10 @@ python serve.py
 
 That one command:
 
-1. builds the search index for the corpus if there isn't one yet (`chroma_db/`
+1. Builds the search index for the corpus if there isn't one yet (`chroma_db/`
    is gitignored, so a fresh clone never has one),
-2. starts the service on `http://localhost:5000` (or on `PORT` if it's set),
-3. writes one JSON line per `/ask` request to `logs/requests.jsonl`.
+2. Starts the service on `http://localhost:5000` (or on `PORT` if it's set),
+3. Writes one JSON line per `/ask` request to `logs/requests.jsonl`.
 
 Stop it with **Ctrl+C**.
 
